@@ -21,8 +21,6 @@
 #include <sys/time.h>
 #include <time.h>
 
-#include <pthread.h>
-
 #define UART_BUFFER 2048
 
 typedef struct serial_parms_s{
