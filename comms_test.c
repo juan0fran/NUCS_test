@@ -118,12 +118,21 @@ void send_routine(void)
             if (data.tx_remaining > 0) {
                 send_packet();
                 if ( receive_control(&data) == 2) {
+                    #if PRINT_INFO
+                    printf("Control packet information --> \t");
+                    printf("Spaces in TX queue: %d, ", data.tx_remaining);
+                    printf("Free Stack: %d %d %d %d\r\n",
+                                data.free_stack[0], data.free_stack[1], data.free_stack[2],
+                                data.free_stack[3]);
+                    #endif
                     test_statistics.sent_packets++;
                     printf("Packet %d sent correctly\r\n", test_statistics.sent_packets);
                 }
+            }else {
+                printf("Queue is full\r\n");
             }
         }
-        sleep(6);
+        sleep(2);
     }
 }
 
@@ -139,8 +148,9 @@ void receive_routine(void)
                 if (receive_frame(&packet) > 0) {
                     #if PRINT_INFO
                     printf("Control packet information --> \t");
-                    printf("Last RSSI: %f, ", data.last_rssi);
-                    printf("Actual RSSI: %f, SNR = %f, ", data.actual_rssi, data.last_rssi - data.actual_rssi);
+                    printf("Packets in RX queue: %d, ", data.rx_queued);
+                    printf("Last RSSI: %0.2f, ", data.last_rssi);
+                    printf("Actual RSSI: %0.2f, SNR = %f, ", data.actual_rssi, data.last_rssi - data.actual_rssi);
                     printf("Free Stack: %d %d %d %d\r\n",
                                 data.free_stack[0], data.free_stack[1], data.free_stack[2],
                                 data.free_stack[3]);
@@ -167,8 +177,9 @@ void retransmit_routine(void)
                 if (receive_frame(&packet) > 0) {
                     #if PRINT_INFO
                     printf("Control packet information --> \t");
-                    printf("Last RSSI: %f, ", data.last_rssi);
-                    printf("Actual RSSI: %f, SNR = %f, ", data.actual_rssi, data.last_rssi - data.actual_rssi);
+                    printf("Packets in RX queue: %d, ", data.rx_queued);
+                    printf("Last RSSI: %0.2f, ", data.last_rssi);
+                    printf("Actual RSSI: %0.2f, SNR = %f, ", data.actual_rssi, data.last_rssi - data.actual_rssi);
                     printf("Free Stack: %d %d %d %d\r\n",
                                 data.free_stack[0], data.free_stack[1], data.free_stack[2],
                                 data.free_stack[3]);
@@ -217,8 +228,9 @@ void send_and_receive_routine(void)
                 if (receive_frame(&packet) > 0) {
                     #if PRINT_INFO
                     printf("Control packet information --> \t");
-                    printf("Last RSSI: %f, ", data.last_rssi);
-                    printf("Actual RSSI: %f, SNR = %f, ", data.actual_rssi, data.last_rssi - data.actual_rssi);
+                    printf("Packets in RX queue: %d, ", data.rx_queued);
+                    printf("Last RSSI: %0.2f, ", data.last_rssi);
+                    printf("Actual RSSI: %0.2f, SNR = %f, ", data.actual_rssi, data.last_rssi - data.actual_rssi);
                     printf("Free Stack: %d %d %d %d\r\n",
                                 data.free_stack[0], data.free_stack[1], data.free_stack[2],
                                 data.free_stack[3]);
@@ -272,8 +284,9 @@ int main(int argc, char ** argv)
             send_control();
             if (receive_control(&data) == 1) {
                 printf("Control packet information --> \t");
-                printf("Last RSSI: %f, ", data.last_rssi);
-                printf("Actual RSSI: %f, SNR = %f, ", data.actual_rssi, data.last_rssi - data.actual_rssi);
+                printf("Packets in RX queue: %d, ", data.rx_queued);
+                printf("Last RSSI: %0.2f, ", data.last_rssi);
+                printf("Actual RSSI: %0.2f, SNR = %f, ", data.actual_rssi, data.last_rssi - data.actual_rssi);
                 printf("Free Stack: %d %d %d %d\r\n",
                             data.free_stack[0], data.free_stack[1], data.free_stack[2],
                             data.free_stack[3]);
