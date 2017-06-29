@@ -3,6 +3,13 @@
 #define PRINT_INFO 1
 #define STORE_INFO 1
 
+#define BLIND_TEST_DURATION         1000
+#define RETRANSMIT_TEST_DURATION    500
+
+static char prefix_path[128];
+#define COMMS_HK_DATA "comms_hk_file.txt"
+#define COMMS_TEST_DATA "comms_test_file.txt"
+
 static char opt;
 static serial_parms_t serial;
 
@@ -42,11 +49,30 @@ void send_control(void)
     }
 }
 
+void store_test_info()
+{
+    FILE *fp;
+    char path[256];
+    #if STORE_INFO
+    sprintf(path, "%s_%s", prefix_path, COMMS_TEST_DATA);
+    fp = fopen(path, "a+");
+    if (fp != NULL) {
+        fprintf(fp, "%d,%d\r\n", test_statistics.sent_packets, test_statistics.received_packets);
+    }else {
+        perror("fopen store data");
+        exit(1);
+    }
+    fclose(fp);
+    #endif
+}
+
 void store_info(comms_hk_data_t *data)
 {
     FILE *fp;
+    char path[256];
     #if STORE_INFO
-    fp = fopen("comms_hk_file.txt", "a+");
+    sprintf(path, "%s_%s", prefix_path, COMMS_HK_DATA);
+    fp = fopen(path, "a+");
     if (fp != NULL) {
         fprintf(fp, "%d,%d,%d,%d,%d,%d,%d,%d,%d,%f,%f,%f,%d,%d,%d,%d\r\n",
                 data->ext_temp, data->int_temp, data->bus_volt,
@@ -55,7 +81,8 @@ void store_info(comms_hk_data_t *data)
                 data->actual_rssi, data->last_rssi, data->last_lqi,
                 data->free_stack[0], data->free_stack[1], data->free_stack[2], data->free_stack[3]);
     }else {
-        perror("fopen");
+        perror("fopen store info");
+        exit(1);
     }
     fclose(fp);
     #endif
@@ -112,7 +139,7 @@ void send_routine(void)
 {
     link_layer_packet_t packet;
     comms_hk_data_t data;
-    while(1) {
+    while(test_statistics.sent_packets < BLIND_TEST_DURATION) {
         send_control();
         if (receive_control(&data) == 1) {
             if (data.tx_remaining > 0) {
@@ -120,19 +147,20 @@ void send_routine(void)
                 if ( receive_control(&data) == 2) {
                     #if PRINT_INFO
                     printf("Control packet information --> \t");
-                    printf("Spaces in TX queue: %d, ", data.tx_remaining);
+                    printf("Temperatures: %d, %d, ", data.ext_temp, data.int_temp);
                     printf("Free Stack: %d %d %d %d\r\n",
                                 data.free_stack[0], data.free_stack[1], data.free_stack[2],
                                 data.free_stack[3]);
                     #endif
                     test_statistics.sent_packets++;
                     printf("Packet %d sent correctly\r\n", test_statistics.sent_packets);
+                    store_test_info();
                 }
             }else {
                 printf("Queue is full\r\n");
             }
         }
-        sleep(2);
+        sleep(4);
     }
 }
 
@@ -140,7 +168,7 @@ void receive_routine(void)
 {
     link_layer_packet_t packet;
     comms_hk_data_t data;
-    while(1) {
+    while(test_statistics.received_packets < BLIND_TEST_DURATION) {
         send_control();
         if (receive_control(&data) == 1) {
             if (data.rx_queued > 0) {
@@ -148,7 +176,7 @@ void receive_routine(void)
                 if (receive_frame(&packet) > 0) {
                     #if PRINT_INFO
                     printf("Control packet information --> \t");
-                    printf("Packets in RX queue: %d, ", data.rx_queued);
+                    printf("Temperatures: %d, %d, ", data.ext_temp, data.int_temp);
                     printf("Last RSSI: %0.2f, ", data.last_rssi);
                     printf("Actual RSSI: %0.2f, SNR = %f, ", data.actual_rssi, data.last_rssi - data.actual_rssi);
                     printf("Free Stack: %d %d %d %d\r\n",
@@ -158,6 +186,7 @@ void receive_routine(void)
                     test_statistics.received_packets++;
                     printf("New packet received --> \tReceived: %d bytes packet. Total Count: %d\r\n",
                                                     packet.fields.len, test_statistics.received_packets);
+                    store_test_info();
                 }
             }
         }
@@ -169,15 +198,15 @@ void retransmit_routine(void)
 {
     link_layer_packet_t packet;
     comms_hk_data_t data;
-    while(1) {
+    while(test_statistics.sent_packets < RETRANSMIT_TEST_DURATION) {
         send_control();
         if (receive_control(&data) == 1) {
-            while (data.rx_queued-- > 0) {
+            if (data.rx_queued > 0) {
                 send_req();
                 if (receive_frame(&packet) > 0) {
                     #if PRINT_INFO
                     printf("Control packet information --> \t");
-                    printf("Packets in RX queue: %d, ", data.rx_queued);
+                    printf("Temperatures: %d, %d, ", data.ext_temp, data.int_temp);
                     printf("Last RSSI: %0.2f, ", data.last_rssi);
                     printf("Actual RSSI: %0.2f, SNR = %f, ", data.actual_rssi, data.last_rssi - data.actual_rssi);
                     printf("Free Stack: %d %d %d %d\r\n",
@@ -186,7 +215,7 @@ void retransmit_routine(void)
                     #endif
                     test_statistics.received_packets++;
                     printf("New packet received --> \tReceived: %d bytes packet. Total Count: %d\r\n",
-                                                    packet.fields.len, test_statistics.received_packets);;
+                                                    packet.fields.len, test_statistics.received_packets);
                 }
                 /* send a TX */
                 if (data.tx_remaining > 0) {
@@ -196,6 +225,7 @@ void retransmit_routine(void)
                         printf("Packet %d sent correctly\r\n", test_statistics.sent_packets);
                     }
                 }
+                store_test_info();
             }
         }
         sleep(1);
@@ -207,7 +237,7 @@ void send_and_receive_routine(void)
     link_layer_packet_t packet;
     comms_hk_data_t data;
     uint32_t start;
-    while(1) {
+    while(test_statistics.sent_packets < RETRANSMIT_TEST_DURATION) {
         send_control();
         if (receive_control(&data) == 1) {
             if (data.tx_remaining > 0) {
@@ -222,13 +252,13 @@ void send_and_receive_routine(void)
                 send_control();
                 receive_control(&data);
                 sleep(1);
-            }while(data.rx_queued == 0 && (time(NULL) - start) < 10);
-            while (data.rx_queued-- > 0) {
+            }while(data.rx_queued == 0 && (time(NULL) - start) < 8);
+            if (data.rx_queued > 0) {
                 send_req();
                 if (receive_frame(&packet) > 0) {
                     #if PRINT_INFO
                     printf("Control packet information --> \t");
-                    printf("Packets in RX queue: %d, ", data.rx_queued);
+                    printf("Temperatures: %d, %d, ", data.ext_temp, data.int_temp);
                     printf("Last RSSI: %0.2f, ", data.last_rssi);
                     printf("Actual RSSI: %0.2f, SNR = %f, ", data.actual_rssi, data.last_rssi - data.actual_rssi);
                     printf("Free Stack: %d %d %d %d\r\n",
@@ -240,8 +270,9 @@ void send_and_receive_routine(void)
                                                     packet.fields.len, test_statistics.received_packets);
                 }
             }
+            store_test_info();
         }
-        sleep(10 - (time(NULL) - start));
+        sleep(8 - (time(NULL) - start));
     }
 }
 
@@ -250,9 +281,10 @@ int main(int argc, char ** argv)
     comms_hk_data_t data;
     int cnt = 0;
     char dev_name[64];
-    if (argc == 3){
+    if (argc == 4){
         strcpy(dev_name, argv[1]);
         opt = argv[2][0];
+        strcpy(prefix_path, argv[3]);
     }else{
         printf("Bad input sintax, specify ./prog_name /dev/...\n");
         exit( -1 );
@@ -284,7 +316,7 @@ int main(int argc, char ** argv)
             send_control();
             if (receive_control(&data) == 1) {
                 printf("Control packet information --> \t");
-                printf("Packets in RX queue: %d, ", data.rx_queued);
+                printf("Temperatures: %d, %d, ", data.ext_temp, data.int_temp);
                 printf("Last RSSI: %0.2f, ", data.last_rssi);
                 printf("Actual RSSI: %0.2f, SNR = %f, ", data.actual_rssi, data.last_rssi - data.actual_rssi);
                 printf("Free Stack: %d %d %d %d\r\n",

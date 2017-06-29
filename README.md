@@ -4,7 +4,7 @@ Compile the test program with make.
 In order to execute:
 
 ```C
-    ./comms_test /dev/ttyNAME opt
+    ./comms_test /dev/ttyNAME opt file_prefix_name
 ```
 Execution options (opt) are:
 | OPT | Explanation             |
