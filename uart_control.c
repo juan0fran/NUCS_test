@@ -95,7 +95,7 @@ int read_port(serial_parms_t * input_handler)
     return read(input_handler->fd, input_handler->buffer, 1);
 }
 
-void clear (serial_parms_t * input_handler)
+void clear(serial_parms_t * input_handler)
 {
     if(available(input_handler) > 0)
     {

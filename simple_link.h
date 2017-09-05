@@ -6,7 +6,7 @@
 #include <stdbool.h>
 #include <string.h>
 
-#define SL_SIMPLE_LINK_MTU      4 * 1024
+#define SL_SIMPLE_LINK_MTU      1800
 #define SL_HEADER_SIZE          6
 
 #define SL_FRAME_END        0xC0

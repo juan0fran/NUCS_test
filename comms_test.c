@@ -25,10 +25,10 @@ void send_packet(void)
     link_layer_packet_t ll_packet_buffer;
     link_layer_packet_t *ll_packet;
     ll_packet = (link_layer_packet_t *) &ll_packet_buffer;
-    for (i = 0; i < 1500; i++) {
+    for (i = 0; i < 1740; i++) {
         ll_packet->fields.payload[i] = i % 256;
     }
-    ll_packet->fields.len = 1500;
+    ll_packet->fields.len = 1740;
     ll_packet->fields.attribs = 9600;
     ll_packet->fields.crc = 0;
     if ( (ret = set_simple_link_packet(ll_packet, ll_packet->fields.len + LINK_LAYER_HEADER_SIZE, 0, 4, &packet) ) > 0) {
@@ -54,6 +54,9 @@ void store_test_info()
     FILE *fp;
     char path[256];
     #if STORE_INFO
+    if (prefix_path[0] == '\0') {
+        return;
+    }
     sprintf(path, "%s_%s", prefix_path, COMMS_TEST_DATA);
     fp = fopen(path, "a+");
     if (fp != NULL) {
@@ -71,6 +74,9 @@ void store_info(comms_hk_data_t *data)
     FILE *fp;
     char path[256];
     #if STORE_INFO
+    if (prefix_path[0] == '\0') {
+        return;
+    }
     sprintf(path, "%s_%s", prefix_path, COMMS_HK_DATA);
     fp = fopen(path, "a+");
     if (fp != NULL) {
@@ -93,6 +99,8 @@ int receive_control(comms_hk_data_t *data)
     simple_link_packet_t packet;
     simple_link_control_t control;
     int ret;
+    prepare_simple_link(&control);
+
     while (read_port(&serial) > 0) {
         if( (ret = get_simple_link_packet(serial.buffer[0], &control, &packet)) > 0) {
             if (packet.fields.config1 == 1) {
@@ -113,6 +121,8 @@ int receive_frame(link_layer_packet_t *ll_packet)
     simple_link_packet_t packet;
     simple_link_control_t control;
     int ret;
+    prepare_simple_link(&control);
+
     while (read_port(&serial) > 0) {
         if( (ret = get_simple_link_packet(serial.buffer[0], &control, &packet)) > 0) {
             if (packet.fields.config1 == 0) {
@@ -285,6 +295,10 @@ int main(int argc, char ** argv)
         strcpy(dev_name, argv[1]);
         opt = argv[2][0];
         strcpy(prefix_path, argv[3]);
+    }else if (argc == 3) {
+        strcpy(dev_name, argv[1]);
+        opt = argv[2][0];
+        prefix_path[0] = '\0';
     }else{
         printf("Bad input sintax, specify ./prog_name /dev/...\n");
         exit( -1 );
@@ -293,7 +307,7 @@ int main(int argc, char ** argv)
         printf("Bad input sintax, specify ./prog_name /dev/...\n");
         exit( -1 );
     }
-    begin(dev_name, B115200, 500, &serial);
+    begin(dev_name, B115200, 250, &serial);
     /* Clear the input */
     clear(&serial);
     test_statistics.sent_packets = 0;
@@ -323,7 +337,8 @@ int main(int argc, char ** argv)
                             data.free_stack[0], data.free_stack[1], data.free_stack[2],
                             data.free_stack[3]);
             }
-            sleep(1);
+            //sleep(1);
+            exit(1);
         }
     }
     close(serial.fd);
