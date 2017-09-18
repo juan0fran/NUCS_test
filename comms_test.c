@@ -237,6 +237,8 @@ void retransmit_routine(void)
                 }
                 store_test_info();
             }
+        }else {
+            printf("Receive control != 1\n");
         }
         sleep(1);
     }
