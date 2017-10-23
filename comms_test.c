@@ -69,6 +69,7 @@ void store_test_info()
     #endif
 }
 
+#if 0
 void store_info(comms_hk_data_t *data)
 {
     FILE *fp;
@@ -93,6 +94,12 @@ void store_info(comms_hk_data_t *data)
     fclose(fp);
     #endif
 }
+#else
+void store_info(comms_hk_data_t *data)
+{
+    /* do nothing */
+}
+#endif
 
 int receive_control(comms_hk_data_t *data)
 {
@@ -152,15 +159,17 @@ void send_routine(void)
     while(test_statistics.sent_packets < BLIND_TEST_DURATION) {
         send_control();
         if (receive_control(&data) == 1) {
-            if (data.tx_remaining > 0) {
+            if (data.control.tx_remaining > 0) {
                 send_packet();
                 if ( receive_control(&data) == 2) {
                     #if PRINT_INFO
                     printf("Control packet information --> \t");
-                    printf("Temperatures: %d, %d, ", data.ext_temp, data.int_temp);
+                    printf("Temperatures: %f, %f, ",
+                                convert_temp_u16_f(data.housekeeping.ext_temp),
+                                convert_temp_u16_f(data.housekeeping.int_temp));
                     printf("Free Stack: %d %d %d %d\r\n",
-                                data.free_stack[0], data.free_stack[1], data.free_stack[2],
-                                data.free_stack[3]);
+                                data.control.free_stack[0], data.control.free_stack[1],
+                                data.control.free_stack[2], data.control.free_stack[3]);
                     #endif
                     test_statistics.sent_packets++;
                     printf("Packet %d sent correctly\r\n", test_statistics.sent_packets);
@@ -181,17 +190,22 @@ void receive_routine(void)
     while(test_statistics.received_packets < BLIND_TEST_DURATION) {
         send_control();
         if (receive_control(&data) == 1) {
-            if (data.rx_queued > 0) {
+            if (data.control.rx_queued > 0) {
                 send_req();
                 if (receive_frame(&packet) > 0) {
                     #if PRINT_INFO
                     printf("Control packet information --> \t");
-                    printf("Temperatures: %d, %d, ", data.ext_temp, data.int_temp);
-                    printf("Last RSSI: %0.2f, ", data.last_rssi);
-                    printf("Actual RSSI: %0.2f, SNR = %f, ", data.actual_rssi, data.last_rssi - data.actual_rssi);
+                    printf("Temperatures: %f, %f, ",
+                                convert_temp_u16_f(data.housekeeping.ext_temp),
+                                convert_temp_u16_f(data.housekeeping.int_temp));
+                    printf("Last LQI: %0.2f, ", lqi_status(data.housekeeping.last_lqi));
+                    printf("Last RSSI: %0.2f, ", rssi_lna_dbm(data.housekeeping.last_rssi));
+                    printf("Actual RSSI: %0.2f, SNR = %f, ",
+                            rssi_lna_dbm(data.housekeeping.actual_rssi),
+                            rssi_lna_dbm(data.housekeeping.last_rssi) - rssi_lna_dbm(data.housekeeping.actual_rssi));
                     printf("Free Stack: %d %d %d %d\r\n",
-                                data.free_stack[0], data.free_stack[1], data.free_stack[2],
-                                data.free_stack[3]);
+                                data.control.free_stack[0], data.control.free_stack[1],
+                                data.control.free_stack[2], data.control.free_stack[3]);
                     #endif
                     test_statistics.received_packets++;
                     printf("New packet received --> \tReceived: %d bytes packet. Total Count: %d\r\n",
@@ -211,24 +225,28 @@ void retransmit_routine(void)
     while(test_statistics.sent_packets < RETRANSMIT_TEST_DURATION) {
         send_control();
         if (receive_control(&data) == 1) {
-            if (data.rx_queued > 0) {
+            if (data.control.rx_queued > 0) {
                 send_req();
                 if (receive_frame(&packet) > 0) {
                     #if PRINT_INFO
                     printf("Control packet information --> \t");
-                    printf("Temperatures: %d, %d, ", data.ext_temp, data.int_temp);
-                    printf("Last RSSI: %0.2f, ", data.last_rssi);
-                    printf("Actual RSSI: %0.2f, SNR = %f, ", data.actual_rssi, data.last_rssi - data.actual_rssi);
+                    printf("Temperatures: %f, %f, ",
+                                convert_temp_u16_f(data.housekeeping.ext_temp),
+                                convert_temp_u16_f(data.housekeeping.int_temp));
+                    printf("Last LQI: %0.2f, ", lqi_status(data.housekeeping.last_lqi));
+                    printf("Last RSSI: %0.2f, ", rssi_lna_dbm(data.housekeeping.last_rssi));
+                    printf("Actual RSSI: %0.2f, SNR = %f, ",
+                            rssi_lna_dbm(data.housekeeping.actual_rssi), rssi_lna_dbm(data.housekeeping.last_rssi) - rssi_lna_dbm(data.housekeeping.actual_rssi));
                     printf("Free Stack: %d %d %d %d\r\n",
-                                data.free_stack[0], data.free_stack[1], data.free_stack[2],
-                                data.free_stack[3]);
+                                data.control.free_stack[0], data.control.free_stack[1],
+                                data.control.free_stack[2], data.control.free_stack[3]);
                     #endif
                     test_statistics.received_packets++;
                     printf("New packet received --> \tReceived: %d bytes packet. Total Count: %d\r\n",
                                                     packet.fields.len, test_statistics.received_packets);
                 }
                 /* send a TX */
-                if (data.tx_remaining > 0) {
+                if (data.control.tx_remaining > 0) {
                     send_packet();
                     if ( receive_control(&data) == 2) {
                         test_statistics.sent_packets++;
@@ -252,7 +270,7 @@ void send_and_receive_routine(void)
     while(test_statistics.sent_packets < RETRANSMIT_TEST_DURATION) {
         send_control();
         if (receive_control(&data) == 1) {
-            if (data.tx_remaining > 0) {
+            if (data.control.tx_remaining > 0) {
                 send_packet();
                 if ( receive_control(&data) == 2) {
                     test_statistics.sent_packets++;
@@ -264,18 +282,22 @@ void send_and_receive_routine(void)
                 send_control();
                 receive_control(&data);
                 sleep(1);
-            }while(data.rx_queued == 0 && (time(NULL) - start) < 8);
-            if (data.rx_queued > 0) {
+            }while(data.control.rx_queued == 0 && (time(NULL) - start) < 8);
+            if (data.control.rx_queued > 0) {
                 send_req();
                 if (receive_frame(&packet) > 0) {
                     #if PRINT_INFO
                     printf("Control packet information --> \t");
-                    printf("Temperatures: %d, %d, ", data.ext_temp, data.int_temp);
-                    printf("Last RSSI: %0.2f, ", data.last_rssi);
-                    printf("Actual RSSI: %0.2f, SNR = %f, ", data.actual_rssi, data.last_rssi - data.actual_rssi);
+                    printf("Temperatures: %f, %f, ",
+                                convert_temp_u16_f(data.housekeeping.ext_temp),
+                                convert_temp_u16_f(data.housekeeping.int_temp));
+                    printf("Last LQI: %0.2f, ", lqi_status(data.housekeeping.last_lqi));
+                    printf("Last RSSI: %0.2f, ", rssi_lna_dbm(data.housekeeping.last_rssi));
+                    printf("Actual RSSI: %0.2f, SNR = %f, ",
+                            rssi_lna_dbm(data.housekeeping.actual_rssi), rssi_lna_dbm(data.housekeeping.last_rssi) - rssi_lna_dbm(data.housekeeping.actual_rssi));
                     printf("Free Stack: %d %d %d %d\r\n",
-                                data.free_stack[0], data.free_stack[1], data.free_stack[2],
-                                data.free_stack[3]);
+                                data.control.free_stack[0], data.control.free_stack[1],
+                                data.control.free_stack[2], data.control.free_stack[3]);
                     #endif
                     test_statistics.received_packets++;
                     printf("New packet received --> \tReceived: %d bytes packet. Total Count: %d\r\n",
@@ -332,12 +354,17 @@ int main(int argc, char ** argv)
             send_control();
             if (receive_control(&data) == 1) {
                 printf("Control packet information --> \t");
-                printf("Temperatures: %d, %d, ", data.ext_temp, data.int_temp);
-                printf("Last RSSI: %0.2f, ", data.last_rssi);
-                printf("Actual RSSI: %0.2f, SNR = %f, ", data.actual_rssi, data.last_rssi - data.actual_rssi);
+                printf("Temperatures: %f, %f, ",
+                            convert_temp_u16_f(data.housekeeping.ext_temp),
+                            convert_temp_u16_f(data.housekeeping.int_temp));
+                printf("Last LQI: %0.2f, ", lqi_status(data.housekeeping.last_lqi));
+                printf("Last RSSI: %0.2f, ", rssi_lna_dbm(data.housekeeping.last_rssi));
+                printf("Actual RSSI: %0.2f, SNR = %f, ",
+                        rssi_lna_dbm(data.housekeeping.actual_rssi), rssi_lna_dbm(data.housekeeping.last_rssi) - rssi_lna_dbm(data.housekeeping.actual_rssi));
                 printf("Free Stack: %d %d %d %d\r\n",
-                            data.free_stack[0], data.free_stack[1], data.free_stack[2],
-                            data.free_stack[3]);
+                            data.control.free_stack[0], data.control.free_stack[1],
+                            data.control.free_stack[2], data.control.free_stack[3]);
+                printf("Control -> %d packets in rx\n", data.control.rx_queued);
             }
             //sleep(1);
             exit(1);
