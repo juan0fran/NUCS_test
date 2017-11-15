@@ -190,22 +190,22 @@ void receive_routine(void)
     while(test_statistics.received_packets < BLIND_TEST_DURATION) {
         send_control();
         if (receive_control(&data) == 1) {
+            printf("Control packet information --> \t");
+            printf("Temperatures: %f, %f, ",
+                        convert_temp_u16_f(data.housekeeping.ext_temp),
+                        convert_temp_u16_f(data.housekeeping.int_temp));
+            printf("Last LQI: %0.2f, ", lqi_status(data.housekeeping.last_lqi));
+            printf("Last RSSI: %0.2f, ", rssi_lna_dbm(data.housekeeping.last_rssi));
+            printf("Actual RSSI: %0.2f, SNR = %f, ",
+                    rssi_lna_dbm(data.housekeeping.actual_rssi),
+                    rssi_lna_dbm(data.housekeeping.last_rssi) - rssi_lna_dbm(data.housekeeping.actual_rssi));
+            printf("Free Stack: %d %d %d %d\r\n",
+                        data.control.free_stack[0], data.control.free_stack[1],
+                        data.control.free_stack[2], data.control.free_stack[3]);        
             if (data.control.rx_queued > 0) {
                 send_req();
                 if (receive_frame(&packet) > 0) {
                     #if PRINT_INFO
-                    printf("Control packet information --> \t");
-                    printf("Temperatures: %f, %f, ",
-                                convert_temp_u16_f(data.housekeeping.ext_temp),
-                                convert_temp_u16_f(data.housekeeping.int_temp));
-                    printf("Last LQI: %0.2f, ", lqi_status(data.housekeeping.last_lqi));
-                    printf("Last RSSI: %0.2f, ", rssi_lna_dbm(data.housekeeping.last_rssi));
-                    printf("Actual RSSI: %0.2f, SNR = %f, ",
-                            rssi_lna_dbm(data.housekeeping.actual_rssi),
-                            rssi_lna_dbm(data.housekeeping.last_rssi) - rssi_lna_dbm(data.housekeeping.actual_rssi));
-                    printf("Free Stack: %d %d %d %d\r\n",
-                                data.control.free_stack[0], data.control.free_stack[1],
-                                data.control.free_stack[2], data.control.free_stack[3]);
                     #endif
                     test_statistics.received_packets++;
                     printf("New packet received --> \tReceived: %d bytes packet. Total Count: %d\r\n",
@@ -327,11 +327,11 @@ int main(int argc, char ** argv)
         printf("Bad input sintax, specify ./prog_name /dev/...\n");
         exit( -1 );
     }
-    if (opt != 't' && opt != 'r' && opt != 'x' && opt != 'w' && opt != 'p') {
+    if (opt != 't' && opt != 'r' && opt != 'x' && opt != 'w' && opt != 'p' && opt != 'y') {
         printf("Bad input sintax, specify ./prog_name /dev/...\n");
         exit( -1 );
     }
-    begin(dev_name, B115200, 250, &serial);
+    begin(dev_name, B115200, 500, &serial);
     /* Clear the input */
     clear(&serial);
     test_statistics.sent_packets = 0;
@@ -349,6 +349,23 @@ int main(int argc, char ** argv)
     }else if (opt == 'w'){
         /* w */
         send_and_receive_routine();
+    }else if (opt == 'y') {
+        while(1) {
+            if (receive_control(&data) == 1) {
+                printf("Control packet information --> \t");
+                printf("Temperatures: %f, %f, ",
+                            convert_temp_u16_f(data.housekeeping.ext_temp),
+                            convert_temp_u16_f(data.housekeeping.int_temp));
+                printf("Last LQI: %0.2f, ", lqi_status(data.housekeeping.last_lqi));
+                printf("Last RSSI: %0.2f, ", rssi_lna_dbm(data.housekeeping.last_rssi));
+                printf("Actual RSSI: %0.2f, SNR = %f, ",
+                        rssi_lna_dbm(data.housekeeping.actual_rssi), rssi_lna_dbm(data.housekeeping.last_rssi) - rssi_lna_dbm(data.housekeeping.actual_rssi));
+                printf("Free Stack: %d %d %d %d\r\n",
+                            data.control.free_stack[0], data.control.free_stack[1],
+                            data.control.free_stack[2], data.control.free_stack[3]);
+                printf("Control -> %d packets in rx\n", data.control.rx_queued);
+            }
+        }
     }else {
         while(1) {
             send_control();
