@@ -1,5 +1,8 @@
  #include "uart_control.h"
 
+#define PREDEFINED_PACKET_LENGTH    200
+#define PREDEFINED_REDUNDANCY       4
+
 #define PRINT_INFO 1
 #define STORE_INFO 1
 
@@ -25,13 +28,14 @@ void send_packet(void)
     link_layer_packet_t ll_packet_buffer;
     link_layer_packet_t *ll_packet;
     ll_packet = (link_layer_packet_t *) &ll_packet_buffer;
-    for (i = 0; i < 1740; i++) {
+    for (i = 0; i < PREDEFINED_PACKET_LENGTH; i++) {
         ll_packet->fields.payload[i] = i % 256;
     }
-    ll_packet->fields.len = 1740;
+    ll_packet->fields.len = PREDEFINED_PACKET_LENGTH;
     ll_packet->fields.attribs = 9600;
     ll_packet->fields.crc = 0;
-    if ( (ret = set_simple_link_packet(ll_packet, ll_packet->fields.len + LINK_LAYER_HEADER_SIZE, 0, 4, &packet) ) > 0) {
+    if ( (ret = set_simple_link_packet(ll_packet, ll_packet->fields.len + LINK_LAYER_HEADER_SIZE,
+                                        0, PREDEFINED_REDUNDANCY, &packet) ) > 0) {
         if (send_kiss_packet(serial.fd, &packet, ret) == -1) {
             printf("Not working!\n");
         }
@@ -201,7 +205,7 @@ void receive_routine(void)
                     rssi_lna_dbm(data.housekeeping.last_rssi) - rssi_lna_dbm(data.housekeeping.actual_rssi));
             printf("Free Stack: %d %d %d %d\r\n",
                         data.control.free_stack[0], data.control.free_stack[1],
-                        data.control.free_stack[2], data.control.free_stack[3]);        
+                        data.control.free_stack[2], data.control.free_stack[3]);
             if (data.control.rx_queued > 0) {
                 send_req();
                 if (receive_frame(&packet) > 0) {
